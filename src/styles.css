@@ -1,0 +1,228 @@
+@import 'tailwindcss';
+
+/* ============================================================
+   SCUDERIA FERRARI · LiDAR Ride Height — Design System
+   Esthétique "race day" technique. Pas de glassmorphism violet.
+   ============================================================ */
+
+@theme {
+  --color-track: #0a0a0a;
+  --color-track-2: #0d0d0d;
+  --color-panel: #121212;
+  --color-panel-line: #1f1f1f;
+  --color-ferrari: #dc0000;
+  --color-ferrari-bright: #ff1e00;
+  --color-sensor: #00ff41;
+  --color-amber: #ffb800;
+  --color-ink: #f5f5f5;
+  --color-muted: #8a8a8a;
+
+  --font-mono: 'JetBrains Mono', 'SF Mono', 'Roboto Mono', ui-monospace,
+    SFMono-Regular, Menlo, monospace;
+
+  --shadow-glow-red: 0 0 24px -4px rgba(220, 0, 0, 0.55);
+  --shadow-glow-green: 0 0 18px -2px rgba(0, 255, 65, 0.5);
+}
+
+@layer base {
+  :root {
+    color-scheme: dark;
+  }
+
+  html,
+  body {
+    background-color: var(--color-track);
+    color: var(--color-ink);
+    font-family:
+      'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  body {
+    margin: 0;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: var(--color-ferrari);
+    color: #fff;
+  }
+
+  /* Scrollbar race-day */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #0a0a0a;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #2a2a2a;
+    border-radius: 0;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-ferrari);
+  }
+}
+
+@layer components {
+  /* Panneau technique de base */
+  .panel {
+    position: relative;
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.02), transparent),
+      var(--color-panel);
+    border: 1px solid var(--color-panel-line);
+    border-radius: 4px;
+  }
+
+  .panel-grid {
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+
+  /* Label mono technique (uppercase tracking) */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-muted);
+  }
+
+  .value-mono {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .title-display {
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: -0.02em;
+    line-height: 0.92;
+  }
+
+  /* Slider rouge Ferrari */
+  .slider-red {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 4px;
+    background: #1f1f1f;
+    border-radius: 2px;
+    outline: none;
+    cursor: pointer;
+  }
+  .slider-red::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--color-ferrari);
+    border: 2px solid #fff;
+    box-shadow: var(--shadow-glow-red);
+    transition: transform 0.1s ease;
+  }
+  .slider-red::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+  }
+  .slider-red::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--color-ferrari);
+    border: 2px solid #fff;
+    box-shadow: var(--shadow-glow-red);
+  }
+
+  .badge-live {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--color-sensor);
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .bg-carbon {
+    background-color: #0a0a0a;
+    background-image:
+      radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+    background-size: 4px 4px;
+  }
+
+  .scanline {
+    background: linear-gradient(
+      180deg,
+      transparent,
+      rgba(0, 255, 65, 0.06) 50%,
+      transparent
+    );
+  }
+
+  @keyframes pulse-dot {
+    0%,
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.35;
+      transform: scale(0.7);
+    }
+  }
+  .animate-pulse-dot {
+    animation: pulse-dot 1.1s ease-in-out infinite;
+  }
+
+  @keyframes sweep {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+  .animate-sweep {
+    animation: sweep 3.2s linear infinite;
+  }
+
+  @keyframes ping-ring {
+    0% {
+      transform: scale(0.6);
+      opacity: 0.8;
+    }
+    100% {
+      transform: scale(2.4);
+      opacity: 0;
+    }
+  }
+  .animate-ping-ring {
+    animation: ping-ring 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+
+  @keyframes ticker {
+    0% {
+      transform: translateX(0);
+    }
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+  .animate-ticker {
+    animation: ticker 22s linear infinite;
+  }
+}
