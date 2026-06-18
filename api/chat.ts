@@ -42,6 +42,65 @@ Tu aides les ingénieurs avec la télémétrie, le LiDAR, le setup, l'aérodynam
 - Speed (km/h), RPM, DRS status, tyre temp (°C)
 - Statut : OPTIMAL / SUBOPTIMAL / CRITICAL`;
 
+const FALLBACK_SIMPLE = `Je suis l'assistant ingénieur de piste Scuderia Ferrari.
+Voici ce que je peux t'expliquer :
+• La garde au sol (ride height) idéale se situe entre 20-40 mm
+• Le rake (assiette) optimal est d'environ +1.0°
+• Le LiDAR scanne la piste à 100 Hz avec une résolution de 0.1 mm
+• L'appui aéro (downforce) dépend de l'effet de sol et du rake
+• Les capteurs IoT mesurent température, humidité et luminosité`;
+
+/**
+ * Fallback : recherche dans la table faq_g2b de la BDD
+ */
+async function fetchFAQFallback(question: string): Promise<string | null> {
+  const DB_HOST = process.env.DB_HOST || 'mysql-pitwallg2.alwaysdata.net';
+  const DB_USER = process.env.DB_USER || 'pitwallg2';
+  const DB_PASSWORD = process.env.DB_PASSWORD || 'Isepeleve';
+  const DB_NAME = process.env.DB_NAME || 'pitwallg2_capteurs';
+
+  try {
+    const mysql = await import('mysql2/promise');
+    const conn = await mysql.createConnection({
+      host: DB_HOST, user: DB_USER, password: DB_PASSWORD,
+      database: DB_NAME, charset: 'utf8mb4', connectTimeout: 4000,
+    });
+
+    // Chercher dans la FAQ
+    const [rows] = await conn.execute(
+      `SELECT * FROM faq_g2b WHERE status='approved' AND (question LIKE ? OR answer LIKE ?) LIMIT 3`,
+      [`%${question}%`, `%${question}%`]
+    ) as [Array<{ question: string; answer: string }>, any];
+
+    await conn.end();
+
+    if (rows.length > 0) {
+      return rows.map((r, i) =>
+        `📌 **${r.question}**\n${r.answer}`
+      ).join('\n\n---\n\n');
+    }
+
+    // Si rien trouvé, retourner les questions disponibles
+    const conn2 = await mysql.createConnection({
+      host: DB_HOST, user: DB_USER, password: DB_PASSWORD,
+      database: DB_NAME, charset: 'utf8mb4', connectTimeout: 4000,
+    });
+    const [allFaq] = await conn2.execute(
+      `SELECT question FROM faq_g2b WHERE status='approved' ORDER BY id`
+    ) as [Array<{ question: string }>, any];
+    await conn2.end();
+
+    if (allFaq.length > 0) {
+      const questions = allFaq.map(r => `• ${r.question}`).join('\n');
+      return `🤖 Aucune correspondance exacte trouvée.\n\nVoici les questions auxquelles je peux répondre :\n${questions}\n\n🔧 Ajoute une clé MISTRAL_API_KEY pour des réponses IA complètes.`;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function getClientIp(req: VercelRequest): string {
   const fwd = req.headers["x-forwarded-for"];
   const realIp = req.headers["x-real-ip"];
@@ -80,10 +139,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  if (!MISTRAL_API_KEY) {
-    return res.status(503).json({ error: "MISTRAL_API_KEY not configured on server." });
-  }
-
   // Rate limiting (10 req/min per IP)
   const ip = getClientIp(req);
   const limit = rateLimit(`chat:${ip}`, 10, 60_000);
@@ -107,6 +162,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     { role: "user", content: message.trim() },
   ];
 
+  // Si pas de clé Mistral → fallback FAQ BDD directement
+  if (!MISTRAL_API_KEY) {
+    try {
+      const faqReply = await fetchFAQFallback(message);
+      if (faqReply) return res.status(200).json({ reply: faqReply, source: "faq" });
+    } catch {}
+    return res.status(200).json({
+      reply: "🔧 Mode hors-ligne — Pas de clé Mistral configurée.\n\n" + FALLBACK_SIMPLE,
+      source: "offline"
+    });
+  }
+
   try {
     const response = await fetch(`${MISTRAL_BASE}/chat/completions`, {
       method: "POST",
@@ -125,6 +192,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!response.ok) {
       const errText = await response.text().catch(() => "");
       console.error("[Chat] Mistral error:", response.status, errText.slice(0, 300));
+      // Fallback FAQ
+      try {
+        const faqReply = await fetchFAQFallback(message);
+        if (faqReply) return res.status(200).json({ reply: faqReply, source: "faq_fallback" });
+      } catch {}
       return res.status(502).json({ error: `Mistral API error: ${response.status}` });
     }
 
@@ -133,15 +205,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       data.choices?.[0]?.message?.content ??
       "Désolé, je n'ai pas pu générer de réponse.";
 
-    const usage = data.usage ? {
-      prompt_tokens: data.usage.prompt_tokens,
-      completion_tokens: data.usage.completion_tokens,
-      total_tokens: data.usage.total_tokens,
-    } : undefined;
-
-    return res.status(200).json({ reply, usage });
+    return res.status(200).json({ reply, source: "mistral" });
   } catch (err) {
     console.error("[Chat] Error:", err);
+    try {
+      const faqReply = await fetchFAQFallback(message);
+      if (faqReply) return res.status(200).json({ reply: faqReply, source: "faq_fallback" });
+    } catch {}
     return res.status(500).json({ error: "Server error" });
   }
 }
