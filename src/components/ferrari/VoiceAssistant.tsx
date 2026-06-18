@@ -29,6 +29,7 @@ export function VoiceAssistant({ onTranscript, onSpeak, enabled = false, mode = 
   modeRef.current = mode
   const enabledRef = useRef(enabled)
   enabledRef.current = enabled
+  const wakeActiveRef = useRef(false)
 
   // =========== Créer l'instance de reconnaissance ===========
   useEffect(() => {
@@ -49,7 +50,7 @@ export function VoiceAssistant({ onTranscript, onSpeak, enabled = false, mode = 
 
     rec.onresult = (event: any) => {
       if (modeRef.current === 'wake') {
-        // Mode wake : détecter le mot-clé
+        // Accumuler tous les nouveaux résultats
         let transcript = ''
         for (let i = event.resultIndex; i < event.results.length; i++) {
           transcript += event.results[i][0].transcript
@@ -57,25 +58,45 @@ export function VoiceAssistant({ onTranscript, onSpeak, enabled = false, mode = 
         const lower = transcript.toLowerCase().trim()
         const isFinal = event.results[event.results.length - 1]?.isFinal
 
-        const wakeIdx = WAKE_WORDS.reduce((found, word) => {
-          const idx = lower.indexOf(word)
-          return idx >= 0 && (found === -1 || idx < found) ? idx : found
-        }, -1)
-
-        if (wakeIdx >= 0 && isFinal) {
-          const matchedWord = WAKE_WORDS.find(w => lower.includes(w)) || 'ferrari'
-          const afterWake = transcript.slice(wakeIdx + matchedWord.length).trim()
-          if (afterWake) {
+        if (wakeActiveRef.current) {
+          // État WAKING : on attend la question après "Ferrari"
+          setInterimText('🎤 ' + transcript)
+          if (isFinal && transcript.trim()) {
+            // Question capturée → envoi
             setWakeActive(false)
+            wakeActiveRef.current = false
             setInterimText('')
             playChime()
-            onTranscript(afterWake)
-          } else {
-            setWakeActive(true)
-            setInterimText('Je t\'écoute…')
+            onTranscript(transcript.trim())
           }
-        } else if (!isFinal) {
-          setInterimText(wakeActive ? '🎤 ' + transcript : '👂 ' + transcript)
+        } else {
+          // État IDLE : on cherche le mot-clé "Ferrari"
+          const wakeIdx = WAKE_WORDS.reduce((found, word) => {
+            const idx = lower.indexOf(word)
+            return idx >= 0 && (found === -1 || idx < found) ? idx : found
+          }, -1)
+
+          if (wakeIdx >= 0) {
+            const matchedWord = WAKE_WORDS.find(w => lower.includes(w)) || 'ferrari'
+            const afterWake = transcript.slice(wakeIdx + matchedWord.length).trim()
+            if (afterWake && isFinal) {
+              // "Ferrari + question" d'un coup → envoi direct
+              setWakeActive(false)
+              wakeActiveRef.current = false
+              setInterimText('')
+              playChime()
+              onTranscript(afterWake)
+            } else if (isFinal) {
+              // Juste "Ferrari" → on attend la question
+              setWakeActive(true)
+              wakeActiveRef.current = true
+              setInterimText('Je t\'écoute…')
+            } else {
+              setInterimText('👂 ' + transcript)
+            }
+          } else {
+            setInterimText('👂 ' + transcript)
+          }
         }
       } else {
         // Mode manuel
