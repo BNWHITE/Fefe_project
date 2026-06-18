@@ -8,8 +8,10 @@ import type { VercelRequest, VercelResponse } from "@vercel/node";
  * Response: { reply: string, usage?: { prompt_tokens, completion_tokens, total_tokens } }
  */
 
-const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
+const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY || '';
+const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const MISTRAL_BASE = "https://api.mistral.ai/v1";
+const GROQ_BASE = "https://api.groq.com/openai/v1";
 
 // In-memory rate limit store (for single-instance deployments)
 interface RateLimitEntry {
@@ -163,55 +165,39 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   ];
 
   // Si pas de clé Mistral → fallback FAQ BDD directement
-  if (!MISTRAL_API_KEY) {
-    try {
-      const faqReply = await fetchFAQFallback(message);
-      if (faqReply) return res.status(200).json({ reply: faqReply, source: "faq" });
-    } catch {}
-    return res.status(200).json({
-      reply: "🔧 Mode hors-ligne — Pas de clé Mistral configurée.\n\n" + FALLBACK_SIMPLE,
-      source: "offline"
-    });
+  // 1. GROQ (ultra-rapide)
+  let reply = await callAI(GROQ_BASE, GROQ_API_KEY, "llama-3.3-70b-versatile", messages);
+  if (reply) return res.status(200).json({ reply, source: "groq" });
+
+  // 2. MISTRAL (fallback)
+  if (MISTRAL_API_KEY) {
+    reply = await callAI(MISTRAL_BASE, MISTRAL_API_KEY, "mistral-small-latest", messages);
+    if (reply) return res.status(200).json({ reply, source: "mistral" });
   }
 
+  // 3. FAQ BDD
   try {
-    const response = await fetch(`${MISTRAL_BASE}/chat/completions`, {
+    const faqReply = await fetchFAQFallback(message);
+    if (faqReply) return res.status(200).json({ reply: faqReply, source: "faq" });
+  } catch {}
+
+  // 4. Offline
+  return res.status(200).json({
+    reply: "🔧 Mode hors-ligne — " + FALLBACK_SIMPLE,
+    source: "offline"
+  });
+}
+async function callAI(baseUrl: string, apiKey: string, model: string, messages: Array<{role:string;content:string}>): Promise<string|null> {
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${MISTRAL_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: "mistral-small-latest",
-        messages,
-        temperature: 0.3,
-        max_tokens: 600,
-      }),
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages, temperature: 0.4, max_tokens: 800 }),
     });
-
-    if (!response.ok) {
-      const errText = await response.text().catch(() => "");
-      console.error("[Chat] Mistral error:", response.status, errText.slice(0, 300));
-      // Fallback FAQ
-      try {
-        const faqReply = await fetchFAQFallback(message);
-        if (faqReply) return res.status(200).json({ reply: faqReply, source: "faq_fallback" });
-      } catch {}
-      return res.status(502).json({ error: `Mistral API error: ${response.status}` });
-    }
-
-    const data = await response.json();
-    const reply =
-      data.choices?.[0]?.message?.content ??
-      "Désolé, je n'ai pas pu générer de réponse.";
-
-    return res.status(200).json({ reply, source: "mistral" });
-  } catch (err) {
-    console.error("[Chat] Error:", err);
-    try {
-      const faqReply = await fetchFAQFallback(message);
-      if (faqReply) return res.status(200).json({ reply: faqReply, source: "faq_fallback" });
-    } catch {}
-    return res.status(500).json({ error: "Server error" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.choices?.[0]?.message?.content ?? null;
+  } catch {
+    return null;
   }
 }

@@ -48,13 +48,17 @@ export function Chatbot() {
 
     let answer = ''
 
-    // 1. Essayer Mistral (/api/chat)
+    // 1. IA Ferrari (Groq → Mistral → FAQ BDD)
     try {
-      const res = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: query, history: messages.slice(-6).map(m => ({ role: m.from === 'user' ? 'user' : 'assistant', content: m.text })) }) })
+      const res = await fetch('/api/chat_ai.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: query, history: messages.slice(-6).map(m => ({ role: m.from === 'user' ? 'user' : 'assistant', content: m.text })) }),
+      })
       if (res.ok) { const d = await res.json(); if (d.reply) answer = d.reply }
     } catch {}
 
-    // 2. Fallback: FAQ BDD
+    // 2. Fallback: FAQ BDD directe
     if (!answer) {
       try {
         const faqRes = await fetch(`/api/db_api.php?action=faq&q=${encodeURIComponent(query)}`)
@@ -62,7 +66,7 @@ export function Chatbot() {
       } catch {}
     }
 
-    // 3. Fallback: réponse locale
+    // 3. Fallback ultime: réponse locale
     if (!answer) {
       answer = localAnswer(query)
       if (!answer) answer = `🤖 ${FALLBACK}`
@@ -85,7 +89,7 @@ export function Chatbot() {
       {open && (
         <div className="panel fixed bottom-24 right-6 z-50 flex h-[30rem] w-[24rem] flex-col overflow-hidden">
           <div className="flex items-center justify-between border-b border-[#1f1f1f] bg-[#0d0d0d] px-4 py-3">
-            <span className="badge-live text-[#dc0000]"><span className="h-1.5 w-1.5 rounded-full bg-[#dc0000] animate-pulse-dot" />Mistral AI · Assistant</span>
+            <span className="badge-live text-[#dc0000]"><span className="h-1.5 w-1.5 rounded-full bg-[#dc0000] animate-pulse-dot" />Ferrari IA · Groq + Mistral</span>
             <div className="flex items-center gap-2">
               <VoiceAssistant onTranscript={handleVoiceTranscript} onSpeak={() => {}} enabled={voiceEnabled} />
               <button onClick={() => setVoiceEnabled((v) => !v)} className={`label-mono text-[10px] ${voiceEnabled ? 'text-[#00ff41]' : 'text-[#555]'}`} title={voiceEnabled ? 'Voix ON' : 'Voix OFF'}>{voiceEnabled ? '🔊' : '🔇'}</button>
