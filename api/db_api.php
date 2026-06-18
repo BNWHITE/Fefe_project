@@ -49,6 +49,11 @@ try {
       $stmt->execute(['etat'=>$etat]);
       echo json_encode(['success'=>true,'message'=>'LED g2c '.($etat?'ON':'OFF'),'etat'=>$etat,'id'=>$bdd->lastInsertId()]);
       break;
+    case 'lidar_g2d':
+      $limit = min(200, intval($_GET['limit'] ?? 50));
+      $stmt = $bdd->query("SELECT * FROM G2D_LIDAR ORDER BY date_mesure DESC LIMIT $limit");
+      echo json_encode(['success'=>true,'data'=>$stmt->fetchAll(),'count'=>$stmt->rowCount()]);
+      break;
     case 'faq':
       $q = trim($_GET['q']??$_POST['q']??'');
       if (!$q) { echo json_encode(['success'=>true,'data'=>$bdd->query("SELECT * FROM faq_g2b WHERE status='approved' ORDER BY id")->fetchAll()]); break; }
