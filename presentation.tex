@@ -1,0 +1,436 @@
+\documentclass[11pt,aspectratio=169]{beamer}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[french]{babel}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{tikz}
+
+% ===== Thème Ferrari =====
+\definecolor{ferrariRed}{RGB}{220,0,0}
+\definecolor{ferrariDark}{RGB}{10,10,10}
+\definecolor{ferrariPanel}{RGB}{18,18,18}
+\definecolor{ferrariText}{RGB}{245,245,245}
+\definecolor{ferrariMuted}{RGB}{138,138,138}
+\definecolor{ferrariGreen}{RGB}{0,255,65}
+\definecolor{ferrariAmber}{RGB}{255,184,0}
+
+\setbeamercolor{background canvas}{bg=ferrariDark}
+\setbeamercolor{normal text}{fg=ferrariText}
+\setbeamercolor{frametitle}{fg=white,bg=ferrariDark}
+\setbeamercolor{title}{fg=ferrariRed}
+\setbeamercolor{subtitle}{fg=ferrariMuted}
+\setbeamercolor{block title}{fg=white,bg=ferrariRed}
+\setbeamercolor{block body}{fg=ferrariText,bg=ferrariPanel}
+\setbeamercolor{item}{fg=ferrariRed}
+\setbeamercolor{section in toc}{fg=ferrariText}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{footline}[frame number]
+\setbeamertemplate{itemize item}{\textcolor{ferrariRed}{$\blacktriangleright$}}
+
+\title{\textcolor{ferrariRed}{Scuderia Ferrari} \\ LiDAR Ride Height}
+\subtitle{Cockpit Ing\'enieur — T\'el\'em\'etrie Temps R\'eel \& IA}
+\author{Projet Fefe}
+\date{\today}
+
+\begin{document}
+
+% ===== SLIDE TITRE =====
+\begin{frame}[plain]
+  \vspace{2cm}
+  \begin{center}
+    {\Huge \textbf{\textcolor{ferrariRed}{Scuderia Ferrari}}} \\[0.3cm]
+    {\LARGE \textbf{LiDAR Ride Height}} \\[0.5cm]
+    {\large Cockpit Ing\'enieur $\cdot$ T\'el\'em\'etrie Temps R\'eel \& IA} \\[1cm]
+    \rule{4cm}{2pt} \\[0.5cm]
+    {\normalsize Projet Fefe --- D\'emonstrateur Full-Stack} \\
+    {\small \today}
+  \end{center}
+\end{frame}
+
+% ===== SOMMAIRE =====
+\begin{frame}{Sommaire}
+  \tableofcontents
+\end{frame}
+
+% ============================================================
+\section{Vision \& Contexte}
+% ============================================================
+
+\begin{frame}{Le Mur des Stands Digital}
+  \begin{columns}
+    \column{0.5\textwidth}
+    \textbf{\textcolor{ferrariRed}{Probl\'ematique :}} \\[0.3cm]
+    \begin{itemize}
+      \item La garde au sol (ride height) est critique en F1
+      \item Un d\'ecrochage de plancher = perte d\'appui soudaine
+      \item Les ing\'enieurs ont besoin de \textbf{donn\'ees en temps r\'eel}
+      \item La complexit\'e requiert une \textbf{IA d\'assistance}
+    \end{itemize}
+
+    \column{0.5\textwidth}
+    \textbf{\textcolor{ferrariRed}{Notre r\'eponse :}} \\[0.3cm]
+    \begin{itemize}
+      \item Dashboard temps r\'eel avec LiDAR 100~Hz
+      \item R\'esolution 0,1~mm sur la garde au sol
+      \item Assistant IA Groq + Mistral int\'egr\'e
+      \item Contr\^ole vocal mains-libres
+      \item Authentification Google OAuth
+    \end{itemize}
+  \end{columns}
+
+  \vspace{0.5cm}
+  \begin{center}
+    \textcolor{ferrariMuted}{\textit{« La garde au sol se joue au millim\`etre. Notre LiDAR la mesure \`a 100 Hz. »}}
+  \end{center}
+\end{frame}
+
+% ============================================================
+\section{Architecture Technique}
+% ============================================================
+
+\begin{frame}{Stack Technique}
+  \begin{center}
+    \begin{tikzpicture}[node distance=1.3cm, auto]
+      \tikzstyle{block} = [rectangle, draw=ferrariRed, fill=ferrariPanel, text=ferrariText, text width=4.5cm, text centered, rounded corners, minimum height=0.9cm]
+      \tikzstyle{line} = [draw, ->, >=stealth, color=ferrariMuted, line width=0.5mm]
+
+      \node [block] (front) {\textbf{Frontend}\\React 19 $\cdot$ TanStack Router\\Tailwind CSS 4 $\cdot$ TypeScript};
+      \node [block, below of=front] (vite) {\textbf{Bundler}\\Vite 7 $\cdot$ HMR};
+      \node [block, below of=vite] (api) {\textbf{API}\\PHP 8.5 (Groq/Mistral)\\Node.js Serverless (Vercel)};
+      \node [block, below of=api] (db) {\textbf{Base de donn\'ees}\\MySQL $\cdot$ AlwaysData\\Mesures $\cdot$ FAQ $\cdot$ LiDAR};
+      \node [block, below of=db] (ai) {\textbf{IA}\\Groq (llama-3.3-70B)\\Mistral (small-latest)};
+
+      \path [line] (front) -- (vite);
+      \path [line] (vite) -- (api);
+      \path [line] (api) -- (db);
+      \path [line] (api) -- (ai);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Flux de Donn\'ees}
+  \begin{enumerate}
+    \item \textbf{Capteurs IoT} $\rightarrow$ Mesures (temp\'erature, humidit\'e, luminosit\'e)
+    \item \textbf{LiDAR G2D} $\rightarrow$ Distance (mm), r\'eflectivit\'e (\%), luminosit\'e (lux)
+    \item \textbf{MySQL} $\rightarrow$ Stockage temps r\'eel (AlwaysData)
+    \item \textbf{PHP API} $\rightarrow$ Exposition REST des donn\'ees
+    \item \textbf{React Dashboard} $\rightarrow$ Affichage live (200 ms refresh)
+    \item \textbf{IA Groq/Mistral} $\rightarrow$ Analyse contextuelle + conseils
+  \end{enumerate}
+
+  \vspace{0.3cm}
+  \begin{block}{Points cl\'es}
+    \begin{itemize}
+      \item 3 niveaux de fallback IA : Groq $\rightarrow$ Mistral $\rightarrow$ FAQ BDD $\rightarrow$ Local
+      \item Proxy Vite PHP/Node pour le d\'eveloppement local
+      \item D\'eploiement Vercel pour la production
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+% ============================================================
+\section{Fonctionnalit\'es Cl\'es}
+% ============================================================
+
+\begin{frame}{Dashboard Cockpit Ing\'enieur}
+  \begin{columns}
+    \column{0.48\textwidth}
+    \textbf{\textcolor{ferrariRed}{T\'el\'em\'etrie Live :}} \\[0.2cm]
+    \begin{itemize}
+      \item KPI : Downforce, Drag, Rake, Balance
+      \item LiDAR AV/AR en mm (vue plongeante)
+      \item Sliders de r\'eglage setup
+      \item Mod\'ele a\'erodynamique temps r\'eel
+      \item Rafra\^ichissement 200 ms
+    \end{itemize}
+
+    \column{0.52\textwidth}
+    \textbf{\textcolor{ferrariRed}{Vues :}} \\[0.2cm]
+    \begin{itemize}
+      \item \textbf{Overview} -- KPIs + statut
+      \item \textbf{Architecture} -- Sch\'ema syst\'eme
+      \item \textbf{Telemetry} -- Setup + a\'ero 3D
+      \item \textbf{Simulators} -- Pit stop + strat\'egie
+      \item \textbf{IoT Devices} -- Capteurs G2D, G2E, LEDs
+    \end{itemize}
+  \end{columns}
+
+  \vspace{0.3cm}
+  \begin{center}
+    \textcolor{ferrariGreen}{\textbf{Statut piste :} OPTIMAL $\cdot$ SUBOPTIMAL $\cdot$ CRITICAL}
+  \end{center}
+\end{frame}
+
+\begin{frame}{Assistant IA Ferrari}
+  \begin{columns}
+    \column{0.5\textwidth}
+    \textbf{\textcolor{ferrariRed}{Chatbot intelligent :}} \\[0.2cm]
+    \begin{itemize}
+      \item Contexte live (DB temps r\'eel)
+      \item Personnage : Ing\'enieur de Piste Ferrari
+      \item R\'eponses en fran\c{c}ais, style italien
+      \item Rendu Markdown (gras, listes, code)
+      \item 3 niveaux de fallback
+    \end{itemize}
+
+    \column{0.5\textwidth}
+    \textbf{\textcolor{ferrariRed}{Vocal \& Auth :}} \\[0.2cm]
+    \begin{itemize}
+      \item Reconnaissance vocale (Web Speech API)
+      \item Mode mains-libres : mot-cl\'e « Ferrari »
+      \item Synth\'ese vocale des r\'eponses
+      \item Google OAuth (connexion s\'ecuris\'ee)
+      \item Fallback FERRARI/16
+    \end{itemize}
+  \end{columns}
+
+  \vspace{0.4cm}
+  \begin{block}{Exemple de r\'eponse IA}
+    \small
+    \textcolor{ferrariGreen}{\textit{« Ciao ! Forza Ferrari ! La garde au sol est de 22,5 mm \`a l\'avant et 38,2 mm \`a l\'arri\`ere. Le rake est dans la plage optimale. Le LiDAR confirme une bonne stabilit\'e du plancher. »}}
+  \end{block}
+\end{frame}
+
+\begin{frame}{Mode Vocal Mains-Libres}
+  \begin{center}
+    \textbf{\textcolor{ferrariRed}{\Large Comment \c{c}a marche ?}}
+  \end{center}
+
+  \vspace{0.3cm}
+  \begin{enumerate}
+    \item \textbf{Activation} : bouton dans le chatbot
+    \item \textbf{\'Ecoute continue} : reconnaissance vocale en boucle
+    \item \textbf{Mot-cl\'e} : « Ferrari » (ou « Hey Ferrari », « OK Ferrari »)
+    \item \textbf{Bip sonore} : confirmation de d\'etection
+    \item \textbf{Question} : dict\'ee apr\'es le bip
+    \item \textbf{R\'eponse} : l\'IA r\'epond + synth\'ese vocale
+  \end{enumerate}
+
+  \vspace{0.3cm}
+  \begin{block}{Sc\'enarios}
+    \begin{itemize}
+      \item \textit{« Ferrari quelle est la garde au sol ? »} $\rightarrow$ r\'eponse directe
+      \item \textit{« Ferrari » [pause] « analyse le setup »} $\rightarrow$ deux temps
+    \end{itemize}
+  \end{block}
+\end{frame}
+
+% ============================================================
+\section{Architecture IA}
+% ============================================================
+
+\begin{frame}{API IA -- 3 Niveaux de Fallback}
+  \begin{center}
+    \begin{tikzpicture}[node distance=1.4cm, auto]
+      \tikzstyle{block} = [rectangle, draw=ferrariRed, fill=ferrariPanel, text=ferrariText, text width=5cm, text centered, rounded corners, minimum height=0.8cm]
+      \tikzstyle{line} = [draw, ->, >=stealth, color=ferrariGreen, line width=0.5mm]
+      \tikzstyle{fail} = [draw, ->, >=stealth, color=ferrariRed, dashed, line width=0.4mm]
+
+      \node [block] (groq) {\textbf{1. Groq}\\llama-3.3-70b-versatile\\Latence < 500 ms};
+      \node [block, below of=groq] (mistral) {\textbf{2. Mistral (fallback)}\\mistral-small-latest};
+      \node [block, below of=mistral] (faq) {\textbf{3. FAQ BDD (fallback)}\\Recherche MySQL};
+      \node [block, below of=faq] (offline) {\textbf{4. Mode hors-ligne}\\R\'eponses cod\'ees};
+
+      \path [fail] (groq) -- node[left,color=ferrariRed] {\small \'Echec} (mistral);
+      \path [fail] (mistral) -- node[left,color=ferrariRed] {\small \'Echec} (faq);
+      \path [fail] (faq) -- node[left,color=ferrariRed] {\small \'Echec} (offline);
+    \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% ============================================================
+\section{S\'ecurit\'e \& Authentification}
+% ============================================================
+
+\begin{frame}{Google OAuth 2.0}
+  \begin{columns}
+    \column{0.55\textwidth}
+    \textbf{\textcolor{ferrariRed}{Flux d\'authentification :}} \\[0.2cm]
+    \begin{enumerate}
+      \item Utilisateur clique « Google Sign-In »
+      \item Google v\'erifie l\'identit\'e
+      \item JWT d\'ecod\'e c\^ot\'e client
+      \item Session persist\'ee (localStorage)
+      \item Dashboard prot\'eg\'e par \texttt{useAuth()}
+    \end{enumerate}
+
+    \column{0.45\textwidth}
+    \textbf{\textcolor{ferrariRed}{S\'ecurit\'e :}} \\[0.2cm]
+    \begin{itemize}
+      \item Cl\'es API \textbf{jamais} expos\'ees
+      \item \texttt{.env.local} exclu du Git
+      \item Rate limiting (10 req/min par IP)
+      \item Fallback local FERRARI/16
+      \item CORS headers sur l\'API
+    \end{itemize}
+  \end{columns}
+
+  \vspace{0.4cm}
+  \begin{alertblock}{Note}
+    Les cl\'es Groq/Mistral sont stock\'ees c\^ot\'e serveur (PHP) et \textbf{jamais} envoy\'ees au client.
+  \end{alertblock}
+\end{frame}
+
+% ============================================================
+\section{Design \& D\'emo}
+% ============================================================
+
+\begin{frame}{Design System Ferrari}
+  \begin{center}
+    \textbf{\textcolor{ferrariRed}{\Large Th\`eme « Race Day »}}
+  \end{center}
+
+  \vspace{0.3cm}
+  \begin{columns}
+    \column{0.48\textwidth}
+    \textbf{Mode Sombre :} \\[0.2cm]
+    \begin{itemize}
+      \item Fond : \#0A0A0A
+      \item Panels : \#121212
+      \item Texte : \#F5F5F5
+      \item Accent : Rosso Corsa \#DC0000
+      \item Sensor : Vert \#00FF41
+    \end{itemize}
+
+    \column{0.48\textwidth}
+    \textbf{Mode Clair (toggle) :} \\[0.2cm]
+    \begin{itemize}
+      \item Fond : \#F5F5F5
+      \item Panels : \#FFFFFF
+      \item Texte : \#1A1A1A
+      \item Accent : Rosso Corsa \#DC0000
+      \item Sensor : Vert \#0A7A2E
+    \end{itemize}
+  \end{columns}
+
+  \vspace{0.3cm}
+  \begin{center}
+    \textcolor{ferrariMuted}{Tailwind CSS 4 $\cdot$ JetBrains Mono $\cdot$ Inter $\cdot$ Animations CSS}
+  \end{center}
+\end{frame}
+
+\begin{frame}{D\'emo Live}
+  \begin{center}
+    {\Large \textcolor{ferrariRed}{\textbf{\`A vous de jouer !}}}
+  \end{center}
+
+  \vspace{0.5cm}
+  \begin{enumerate}
+    \item \textbf{Vitrine publique} -- Storytelling Ferrari, circuit Monza interactif
+    \item \textbf{Connexion Google} -- OAuth ou FERRARI/16
+    \item \textbf{Cockpit Dashboard} -- T\'el\'em\'etrie live, sliders setup
+    \item \textbf{Assistant IA} -- Posez une question technique
+    \item \textbf{Mode vocal} -- Dites « Ferrari » + question
+    \item \textbf{Toggle Clair/Sombre} -- Mode clair/sombre
+  \end{enumerate}
+
+  \vspace{0.5cm}
+  \begin{center}
+    \textcolor{ferrariRed}{\texttt{npm run dev:php}}
+  \end{center}
+\end{frame}
+
+% ============================================================
+\section{Conclusion}
+% ============================================================
+
+\begin{frame}{Conclusion}
+  \begin{center}
+    {\Huge \textcolor{ferrariRed}{\textbf{Forza Ferrari!}}} \\[0.8cm]
+
+    {\Large Un cockpit ing\'enieur complet :} \\[0.5cm]
+
+    \begin{itemize}
+      \setlength\itemsep{0.3cm}
+      \item \textbf{T\'el\'em\'etrie temps r\'eel} -- LiDAR, a\'ero, setup
+      \item \textbf{IA Groq + Mistral} -- Assistant contextuel
+      \item \textbf{Vocal mains-libres} -- Mot-cl\'e « Ferrari »
+      \item \textbf{Google OAuth} -- Connexion s\'ecuris\'ee
+      \item \textbf{Design Ferrari} -- Dark/Light mode
+      \item \textbf{Full-stack} -- React, PHP, MySQL, Vercel
+    \end{itemize}
+
+    \vspace{0.6cm}
+    \rule{6cm}{2pt} \\[0.3cm]
+    {\large \texttt{github.com/evanmse/Fefe\_project}} \\[0.2cm]
+    \textcolor{ferrariMuted}{Questions ?}
+  \end{center}
+\end{frame}
+
+% ============================================================
+\appendix
+\section{Annexes}
+% ============================================================
+
+\begin{frame}{Stack D\'etaill\'ee}
+  \begin{columns}
+    \column{0.33\textwidth}
+    \textbf{\textcolor{ferrariRed}{Frontend :}} \\[0.1cm]
+    \begin{itemize}
+      \item React 19
+      \item TanStack Router
+      \item Tailwind CSS 4
+      \item TypeScript 5.7
+      \item Web Speech API
+      \item Web Audio API
+    \end{itemize}
+
+    \column{0.33\textwidth}
+    \textbf{\textcolor{ferrariRed}{Backend :}} \\[0.1cm]
+    \begin{itemize}
+      \item PHP 8.5 (API REST)
+      \item Node.js (Vercel)
+      \item MySQL (AlwaysData)
+      \item cURL (Groq/Mistral)
+      \item PDO (DB)
+    \end{itemize}
+
+    \column{0.33\textwidth}
+    \textbf{\textcolor{ferrariRed}{DevOps :}} \\[0.1cm]
+    \begin{itemize}
+      \item Vite 7
+      \item Vercel
+      \item GitHub (2 remotes)
+      \item gh CLI
+      \item npm scripts
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+\begin{frame}{Structure du Projet}
+  \begin{columns}
+    \column{0.45\textwidth}
+    \textbf{\textcolor{ferrariRed}{Arborescence :}} \\[0.2cm]
+    \texttt{%
+    api/ \\
+    \quad chat\_ai.php \\
+    \quad chat.ts \\
+    \quad db\_api.php \\
+    src/ \\
+    \quad components/ferrari/ \\
+    \quad contexts/ \\
+    \quad routes/ \\
+    \quad hooks/ \\
+    config.php \\
+    vite.config.ts}
+
+    \column{0.55\textwidth}
+    \textbf{\textcolor{ferrariRed}{Contexts React :}} \\[0.2cm]
+    \begin{itemize}
+      \item \texttt{AuthContext} -- Google OAuth
+      \item \texttt{ThemeContext} -- Dark/Light
+    \end{itemize}
+
+    \vspace{0.3cm}
+    \textbf{\textcolor{ferrariRed}{GitHub :}} \\[0.2cm]
+    \begin{itemize}
+      \item \texttt{origin} $\rightarrow$ evanmse/Fefe\_project
+      \item \texttt{bnwhite} $\rightarrow$ BNWHITE/Fefe\_project
+    \end{itemize}
+  \end{columns}
+\end{frame}
+
+\end{document}
